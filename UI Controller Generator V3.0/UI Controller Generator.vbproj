@@ -186,6 +186,7 @@
       <LastGenOutput>Settings.Designer.vb</LastGenOutput>
     </None>
     <None Include="Resources\Help-icon.png" />
+    <Content Include="ReadMe.txt" />
     <Content Include="Templates\TransactionControllerGenerator.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <CustomToolNamespace>My.Templates</CustomToolNamespace>
