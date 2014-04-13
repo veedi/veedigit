@@ -1,0 +1,681 @@
+﻿<#@ template language="VB" #>
+'<auto generated>
+'This code was designed by Transaction framework team for transaction UI controller
+'Generated @ <#=DateTime.Now()#> 
+'User :<#=UserName#>
+'Workstation :<#=WorkstationName#>
+'Modifications to the file may cause deviations to actual transaction framework behavior, also code may be lost if regenerated
+'</auto generated>
+Imports System.Collections.ObjectModel
+Imports System.ServiceModel
+Imports HP.Comet.Presentation.Common
+Imports HP.Comet.Presentation.Common.Data.Contracts
+Imports HP.Comet.Presentation.Common.View.Model
+Imports HP.Comet.Presentation.Customer.Data.Contracts
+Imports HP.Comet.Presentation.Customer.Services.Proxies
+Imports HP.Comet.Presentation.Customer.View.Model
+Imports HP.Comet.Presentation.Driver.Credential.Services.Proxies
+Imports HP.Comet.Presentation.Driver.Data.Contracts
+
+ Public Class <#=TransactionName #>Controller
+    Inherits TransactionDetailController(Of <#=TransactionName #>)
+	<#If WorkflowEnabled Then#>
+	Implements IProcessWorkflowController
+	<#End If#> 
+
+    ''' <summary>
+    ''' Initialize New Learner Permit transaction data.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Public Sub New()
+        'Initialize or get transaction data.
+        TransactionData = New <#=TransactionName #>
+        TransactionData.TransactionContextDetail = New TransactionContextDetail
+        TransactionData.TransactionContextDetail.Transaction = New Transaction
+        TransactionData.TransactionContextDetail.TransactionType = New TransactionType() With {
+                                                    .TransactionTypeId = CShort(TransactionTypeCode.<#=TransactionName #>),
+                                                    .Description = "<#=TransactionName #>"
+                                                 }
+    End Sub
+
+    ''' <summary>
+    ''' Check whether the customer is eligible to initiate the requested transaction or not.
+    ''' </summary>
+    ''' <returns>True if eligible</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function IsCustomerEligibleForTransaction() As Boolean
+        Dim result As CustomerEligibilityCollection = Nothing
+        Dim isEligibleForTransaction As Boolean = True
+
+        Try
+            IsCustomerEligibleForTransactionCore(result)
+            If result IsNot Nothing AndAlso result.Count > 0 Then
+                For Each eligibility In result
+                    If (Not (eligibility.IsEligible)) Then
+                        isEligibleForTransaction = eligibility.IsEligible
+                        UIHelper.ShowMessageBox(eligibility.Description, My.Resources.ApplicationName,
+                                                Presentation.Common.ButtonStyle.OkOnly, ImageDisplay.Critical)
+                        Exit Try
+                    End If
+                Next
+            End If
+
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                With TransactionData.TransactionContextDetail
+                    result = <#=CamelTransactionName #>Client.
+                    IsCustomerEligibleForTransaction(Provisioning.Instance.CustomerService.TransactionCustomer.CustomerId)
+                End With
+            End Using
+
+            If (result IsNot Nothing AndAlso result.Count > 0) Then
+                For Each eligibility In result
+                    If (Not (eligibility.IsEligible)) Then
+                        isEligibleForTransaction = eligibility.IsEligible
+                        UIHelper.ShowMessageBox(eligibility.Description, My.Resources.ApplicationName,
+                                                Presentation.Common.ButtonStyle.OkOnly, ImageDisplay.Critical, 10, 90)
+                        Exit For
+                    ElseIf eligibility.IsEligible Then
+                        Dim isEligible As System.Windows.Forms.DialogResult
+                        isEligible = UIHelper.ShowMessageBox(eligibility.Description, My.Resources.ApplicationName,
+                                                Presentation.Common.ButtonStyle.YesNo, ImageDisplay.Question)
+                        If isEligible = System.Windows.Forms.DialogResult.Yes Then
+                            isEligibleForTransaction = True
+                        ElseIf isEligible = System.Windows.Forms.DialogResult.No Then
+                            isEligibleForTransaction = False
+                        End If
+                    End If
+                Next
+            End If
+
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return isEligibleForTransaction
+    End Function
+
+    Partial Private Sub IsCustomerEligibleForTransactionCore(ByRef result As CustomerEligibilityCollection)
+
+    End Sub
+
+    ''' <summary>
+    ''' Initialize the transaction. Set show prerequisite information etc.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Protected Overrides Sub InitializeTransaction()
+        Try
+            'Set user controls for prerequisite form
+            ShowPrequisiteFormCore()
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+    End Sub
+
+    Partial Private Sub ShowPrequisiteFormCore()
+
+    End Sub
+
+    ''' <summary>
+    ''' Fetch first workflow step details
+    ''' And bind the data with the current transaction data
+    ''' </summary>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetCurrentWorkflowStep() As TransactionWorkflowSummary
+        Dim currentWorkflowStep As TransactionWorkflowSummary = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                currentWorkflowStep = <#=CamelTransactionName #>Client.GetCurrentWorkflowStep()
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return currentWorkflowStep
+    End Function
+
+    ''' <summary>
+    ''' Method to retrieve the mandatory documents for prerequisite document.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetMandatoryDocuments() As TransactionDocumentSummaryCollection
+        Dim mandatoryDocuments As TransactionDocumentSummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                With TransactionData.TransactionContextDetail
+                    mandatoryDocuments = <#=CamelTransactionName #>Client.GetMandatoryDocuments()
+                End With
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return mandatoryDocuments
+    End Function
+
+    ''' <summary>
+    ''' Create unique identifier for each transaction.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Protected Overrides Function CreateTransaction() As Integer
+
+        Dim transactionId As Integer
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                transactionId = <#=CamelTransactionName #>Client.
+                CreateTransaction(Provisioning.Instance.CustomerService.TransactionCustomer.CustomerId,
+                                  Provisioning.Instance.TransactionCart.TransactionCartId,
+                                  TransactionData.TransactionContextDetail. _
+                                  TransactionWorkflowSummary.TransactionStep.TransactionStepId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return transactionId
+    End Function
+
+    ''' <summary>
+    ''' Method to set the transaction owner information.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Protected Overrides Sub SetTransactionCustomerInformation()
+        Dim transactionContextCustomerViewModel As TransactionContextCustomerViewModel
+
+        Try
+            'Call the Customer Service to get the customer Information
+            Dim customerId As Integer = Provisioning.Instance.CustomerService.TransactionCustomer.CustomerId
+
+            If (Provisioning.Instance.CustomerService.TransactionCustomer.CustomerType =
+                HP.Comet.Presentation.Customer.CustomerType.Individual) Then
+                Dim individualCustomer As Individual
+
+                Using customerClient As CustomerServiceProxy = New CustomerServiceProxy()
+                    individualCustomer = customerClient.GetIndividualCustomerDetails(customerId)
+                End Using
+
+                transactionContextCustomerViewModel = New TransactionContextCustomerViewModel
+                Provisioning.Instance.CustomerService.TransactionCustomer =
+                    transactionContextCustomerViewModel.GetCustomerTransactionSummary(individualCustomer)
+                SetTransactionCustomerInformationCore(individualCustomer)
+
+            Else
+                Dim businessCustomer As Business
+
+                Using customerClient As CustomerServiceProxy = New CustomerServiceProxy()
+                    businessCustomer = customerClient.GetBusinessCustomerDetails(customerId)
+                End Using
+
+                transactionContextCustomerViewModel = New TransactionContextCustomerViewModel
+                Provisioning.Instance.CustomerService.TransactionCustomer =
+                    transactionContextCustomerViewModel.GetCustomerTransactionSummary(businessCustomer)
+
+            End If
+            Provisioning.Instance.CustomerService.TransactionCustomer.CustomerId = customerId
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+    End Sub
+
+	Partial private sub SetTransactionCustomerInformationCore(ByRef result as Individual)
+
+	End Sub
+
+    ''' <summary>
+    ''' Get list of user controls for application step required in the transaction.
+    ''' </summary>
+    ''' <returns>List of user controls</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetApplicationTransactionSteps(ByVal isSummaryMode As Boolean) As  _
+                                                                Collection(Of CustomUserControl)
+        Dim result As Collection(Of CustomUserControl) = Nothing
+
+        Try
+            GetApplicationTransactionStepsCore(isSummaryMode, result)
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return result
+    End Function
+
+    Partial Private Sub GetApplicationTransactionStepsCore(ByVal isSummaryMode As Boolean, ByRef result As Collection(Of CustomUserControl))
+
+    End Sub
+
+    ''' <summary>
+    ''' Validate user input in application step and reload application step data based on
+    ''' user input for e.g.: Requirements, Restrictions etc.
+    ''' </summary>
+    ''' <param name="activeApplicationTabPageName">Current active tab name in application form</param>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function ValidateApplicationStep(ByVal activeApplicationTabPageName As String) As Boolean
+        Dim result As Boolean = False
+
+        Try
+            ValidateApplicationStepCore(activeApplicationTabPageName, result)
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return result
+    End Function
+
+    Partial Private Sub ValidateApplicationStepCore(ByVal activeApplicationTabPageName As String, ByRef result As Boolean)
+
+    End Sub
+
+    ''' <summary>
+    ''' Get interface results which are initiated for the transaction. This method shall implement logic
+    ''' to fetch interface results.
+    ''' </summary>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetInterfaceResults() As TransactionInterfaceCollection
+        Dim interfaceResults As InterfaceResultCollection = Nothing
+
+        Try
+            GetInterfaceResultsCore(interfaceResults)
+            Return interfaceResults.ToDataContractCollection
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return Nothing
+    End Function
+
+    Partial Private Sub GetInterfaceResultsCore(ByRef interfaceResults As InterfaceResultCollection)
+
+    End Sub
+
+    ''' <summary>
+    ''' Get applicable document types for the transaction based on user data. This method returns list of 
+    ''' all mandatory document types that are required to process the transaction and conditional document
+    ''' types based on user input data.
+    ''' </summary>
+    ''' <returns>List of Mandatory and Conditional document types</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetDocuments() As TransactionDocumentSummaryCollection
+        Dim requiredDocuments As TransactionDocumentSummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                requiredDocuments = <#=CamelTransactionName #>Client. _
+                    GetDocuments(TransactionData.TransactionContextDetail.Transaction.TransactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return requiredDocuments
+    End Function
+
+    ''' <summary>
+    ''' Get valid documents for the document type that are applicable for transaction. This is used to
+    ''' load documents drop down in document step screen.
+    ''' </summary>
+    ''' <returns>List of applicable documents associated with transaction for the document type</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetDocumentsForDocumentTypes() As TransactionDocumentSummaryCollection
+        Dim applicableDocuments As TransactionDocumentSummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                applicableDocuments = <#=CamelTransactionName #>Client.GetTransactionApplicableDocuments()
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return applicableDocuments
+    End Function
+
+    ''' <summary>
+    ''' Get applicable deficiencies for the transaction based on user input. This method returns list of 
+    ''' deficiencies that are created for the transaction. This includes interface deficiency, 
+    ''' document deficiency and data deficiency.
+    ''' </summary>
+    ''' <returns>List of deficiencies created</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetDeficiencies() As TransactionDeficiencySummaryCollection
+        Dim applicableDeficiencies As TransactionDeficiencySummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                applicableDeficiencies = <#=CamelTransactionName #>Client. _
+                                        GetDeficiencies(TransactionData.TransactionContextDetail.Transaction.TransactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return applicableDeficiencies
+    End Function
+
+    ''' <summary>
+    ''' Get applicable fee types for the transaction based on user input.
+    ''' </summary>
+    ''' <returns>List of fee type</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetApplicableFee() As TransactionFeeSummaryCollection
+        Dim feeTypes As TransactionFeeSummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                feeTypes = <#=CamelTransactionName #>Client.GetFees(TransactionData.TransactionContextDetail.Transaction.TransactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return feeTypes
+    End Function
+
+    ''' <summary>
+    ''' Save transaction specific i.e user input to staging area.
+    ''' </summary>
+    ''' <returns>True on successful save, else false</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function SaveDataToWorkInProgress() As Boolean
+        Dim result As Boolean = False
+
+        Try
+            SaveDataToWorkInProgressCore()
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                <#=CamelTransactionName #>Client.SaveWorkInProgressTransactionData(Me.TransactionData)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return result
+    End Function
+
+    Partial Private Sub SaveDataToWorkInProgressCore()
+
+    End Sub
+
+    ''' <summary>
+    ''' To fetch next workflow approval step for active transaction
+    ''' </summary>
+    ''' <param name="transactionId">Holds the transaction Id</param>
+    ''' <returns>current transaction applicable workflow step</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetNextWorkflowStep(ByVal transactionId As Integer) As TransactionWorkflowSummary
+        Dim result As TransactionWorkflowSummary = Nothing
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                result = <#=CamelTransactionName #>Client.GetNextWorkflowStep(transactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' Generate list of output document for the transaction.
+    ''' </summary>
+    ''' <remarks></remarks>
+    Protected Overrides Sub GenerateOutputDocuments(ByVal transactionId As Integer)
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                <#=CamelTransactionName #>Client.GenerateOutputDocument(transactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+    End Sub
+
+    ''' <summary>
+    ''' Complete the transaction. Save all user input data to main table from the staging
+    ''' area.
+    ''' </summary>
+    ''' <param name="transactionId">Unique id for the transaction</param>
+    ''' <returns>List of error messages, if any</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function FinalizeTransaction(ByVal transactionId As Integer, ByVal assignedStaffId As Integer, _
+                                 ByVal nextStepId As Integer) As Collection(Of String)
+        Dim result As New Collection(Of String)
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                result = <#=CamelTransactionName #>Client.FinalizeTransactionData(transactionId, assignedStaffId, nextStepId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' Method to update the transaction status in case of Deferred /Cancel
+    ''' </summary>
+    ''' <param name="transactionId">Holds the transaction Id</param>
+    ''' <param name="transactionStatusType">Holds the transaction type</param>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function UpdateTransactionStatus(ByVal transactionId As Integer, _
+                                                         ByVal transactionStatusType As Short) As Boolean
+        Dim result As Boolean
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                result = <#=CamelTransactionName #>Client.UpdateTransactionStatus(transactionId, transactionStatusType)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' Get transaction document information processed during the transaction. This information will be fetched
+    ''' from WIP.
+    ''' </summary>
+    ''' <returns>List of documents processed during the transaction</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetDocumentsSummary() As TransactionDocumentSummaryCollection
+        Dim requiredDocuments As TransactionDocumentSummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                requiredDocuments = <#=CamelTransactionName #>Client.GetTransactionDocumentsSummary( _
+                    TransactionData.TransactionContextDetail.Transaction.TransactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return requiredDocuments
+    End Function
+
+    ''' <summary>
+    ''' Get applicable deficiencies for the transaction based on user input. This method returns list of 
+    ''' deficiencies that are created for the transaction. This includes interface deficiency, 
+    ''' document deficiency and data deficiency.
+    ''' </summary>
+    ''' <returns>List of deficiencies created</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetDeficienciesSummary() As TransactionDeficiencySummaryCollection
+        Dim applicableDeficiencies As TransactionDeficiencySummaryCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                applicableDeficiencies = <#=CamelTransactionName #>Client.GetTransactionDeficienciesSummary( _
+                    TransactionData.TransactionContextDetail.Transaction.TransactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return applicableDeficiencies
+    End Function
+
+    ''' <summary>
+    ''' To fetch the interface summary for a transaction
+    ''' </summary>
+    ''' <returns>List of interface results for the transaction initiated</returns>
+    ''' <remarks></remarks>
+    Protected Overrides Function GetInterfaceSummary() As TransactionInterfaceCollection
+        Dim transactionInterfaces As TransactionInterfaceCollection = Nothing
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                transactionInterfaces = <#=CamelTransactionName #>Client.GetTransactionInterfacesSummary( _
+                    TransactionData.TransactionContextDetail.Transaction.TransactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return transactionInterfaces
+    End Function
+
+	<#If WorkflowEnabled Then#>
+	''' <summary>
+    ''' Check Eligibility for the user to approve the transaction in approval step.
+    ''' </summary>
+    ''' <param name="transactionId">Unique identifier for the transaction to approve</param>
+    ''' <returns>Non Eligibility summary</returns>
+    ''' <remarks></remarks>
+    Public Function IsEligibleToApprove(ByVal transactionId As Integer) As EligibilitySummaryCollection Implements Common.IProcessWorkflowController.IsEligibleToApprove
+        Dim eligibilitysToApprove As New EligibilitySummaryCollection
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                eligibilitysToApprove = <#=CamelTransactionName #>Client.IsEligibleToApprove(transactionId:=transactionId)
+            End Using
+
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+        Return eligibilitysToApprove
+    End Function
+
+    ''' <summary>
+    ''' Assign the transaction to self and approve or move the transaction to next level of approval.
+    ''' </summary>
+    ''' <returns>List of error collection if any</returns>
+    ''' <remarks></remarks>
+    Public Function FinalizeWorkflowData(ByVal transactionId As Integer) As System.Collections.ObjectModel.Collection(Of String) Implements Common.IProcessWorkflowController.FinalizeWorkflowData
+        Dim result As New Collection(Of String)
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                result = <#=CamelTransactionName #>Client.FinalizeWorkflowData(transactionId)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return result
+    End Function
+
+	Public Function IsEligibleToReject(transactionId As Integer) As Common.Data.Contracts.EligibilitySummaryCollection Implements Common.IProcessWorkflowController.IsEligibleToReject
+        Dim eligibilitysToReject As New EligibilitySummaryCollection
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                eligibilitysToReject = <#=CamelTransactionName #>Client.IsEligibleToReject(transactionId:=transactionId)
+            End Using
+
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+        Return eligibilitysToReject
+    End Function
+
+    Public Function FinalizeRejectWork(transactionId As Integer, rejectionReason As String) As System.Collections.ObjectModel.Collection(Of String) Implements Common.IProcessWorkflowController.FinalizeRejectWork
+        Dim result As New Collection(Of String)
+
+        Try
+            Using <#=CamelTransactionName #>Client As New <#=TransactionName #>ServiceProxy
+                result = <#=CamelTransactionName #>Client.FinalizeRejectWork(transactionId, rejectionReason)
+            End Using
+        Catch ex As FaultException(Of HP.Comet.Presentation.Data.Contracts.ServiceFault)
+            Throw New LoggedException(ex.Message, ex, ex.Detail.ErrorCode, False, _
+                                      ex.Detail.MessageDetail, ex.Detail.ExceptionSource)
+        Catch ex As LoggedException
+            ExceptionProcessor.ProcessUnhandledException(ex, PolicyName.PropagatePolicy)
+        End Try
+
+        Return result
+    End Function
+	<#End If#>
+End Class
